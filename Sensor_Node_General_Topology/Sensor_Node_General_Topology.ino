@@ -65,8 +65,9 @@ void stateMachine(){
     
     case SYNC:
       //---read input stream---//
-      
+      readData();
       //sync based on first message
+      
       break;
     case WAIT:
 
@@ -118,18 +119,15 @@ void stateMachine(){
 // readData()
 // Helper function that updates the variables that hold the data. Created to simplify code. (and improve efficency)
 void readData(){
-Serial.println("S" + (String)ID.toInt());
   //--Read the data--//
   if(Serial.available()){
     String incoming = Serial.readStringUntil('\r'); 
   }
-
   //--Check for sync or not--//
   String sync_flag = incoming.substring(0,1); //grab first character
-
   if (sync_flag == "G"){  //if general sync 
     is_sync = true;
-    time_in = incoming.substring(1,incoming.length());//maybe broken bc bad indexing
+    time_in = incoming.substring(1,incoming.length()); //maybe broken bc bad indexing
   }
 
   else if(sync_flag == "S"){  //if normal sync 
