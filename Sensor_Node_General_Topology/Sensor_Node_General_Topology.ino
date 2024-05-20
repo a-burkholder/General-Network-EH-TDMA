@@ -40,6 +40,8 @@ String time_in = ""; // the global cycle time coming in
 
 bool energyAvailible();
 void stateMachine();
+bool readData();
+unsigned long cycleTime();
 
 void setup() {
   // put your setup code here, to run once:
@@ -65,9 +67,9 @@ bool energyAvailible(){
   else return false;
 }
 
-// stateMachine()
+// nodeFSM()
 // The function that implements the states and their functionality in the nodes
-void stateMachine(){
+void nodeFSM(){
   static enum { DEAD, SYNC, WAIT, ACTIVE } state = DEAD;
   switch (state) {
     case DEAD:
