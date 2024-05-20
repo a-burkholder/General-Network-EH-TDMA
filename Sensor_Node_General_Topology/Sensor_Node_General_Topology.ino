@@ -1,11 +1,13 @@
 
 
-
+/* Constants and assumptions*/
 const int TOTAL_NODES = 5; // Total number of nodes in the network
-const String ID = "04"; // Each node knows its ID based on assumption
 const int TIME_SLOT = 500; // amount of time per slot in milliseconds (ms) 10^-3
+const unsigned long CYCLE_LENGTH = TOTAL_NODES*TIME_SLOT; // total length of one cycle
 const int ERROR = 60; // Transmission time error threshold
+const String ID = "04"; // Each node knows its ID based on assumption
 const int ENERGY_CHANCE = 80; // energy harvest rate
+
 
 
 /* FLAGS... and stuff*/
@@ -16,12 +18,12 @@ bool is_sync = false; // keeps track of if the last read message was a sync
 
 
 /* Timers */
-
 unsigned long transmit_time; // time in the cycle to transmit
-unsigned long cycle_time = 0; // global cycle time from the last sync message
+unsigned long global_time = 0; // global cycle time from the last sync message
+long offset = 0; // offset from the node's cycle to the global cycle
 
-unsigned long wait_time = 0; // time to wait before next active state
-unsigned long start_wait = 0; // start time of the waiting
+unsigned long start_clock = 0; // the current node's equivalent time to the global cycle time
+
 
 
 
@@ -41,13 +43,15 @@ void stateMachine();
 
 void setup() {
   // put your setup code here, to run once:
-  transmit_time = (ID-1) * TIME_SLOT;
+  transmit_time = (ID.toInt() - 1) * TIME_SLOT;
   Serial.begin(9600);
+
+  
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-  Serial.println(cycleTime());
+  \
 
 }
 
@@ -82,9 +86,9 @@ void stateMachine(){
       }
       
       if(updated){
-        cycle_time = time_in; // sync based on message
-        wait_time = transmit_time - cycle_time; // find time needed to wait
-        start_wait = millis();
+        global_time = time_in.toInt(); // sync based on message
+        start_clock = millis();
+        offset = ((int)global_time - (int)start_clock);
         state = WAIT;
       }
 
@@ -93,7 +97,7 @@ void stateMachine(){
 
     case WAIT:
       // check if in time slot
-      if(millis() - start_wait >= wait_time){
+      if(cycleTime() >= transmit_time){
         state = ACTIVE;
         break;
       }
@@ -122,7 +126,7 @@ void stateMachine(){
       }
       else {
         state = DEAD;
-        break:
+        break;
       }
 
       break;
@@ -167,14 +171,14 @@ bool readData(){
       data_in = incoming.substring(data_idx + 1, incoming.length());
     }
   }
+  Serial.flush();
   return isMessage;
 }
 
-
 // cycleTime()
-// helper function to keep the time in the range of one cycle
+// helper function to keep the time in the range of one cycle and incorporate the offset
 unsigned long cycleTime(){
-  return millis()%(((TOTAL_NODES)*TIME_SLOT));
+  return (millis() + offset) % CYCLE_LENGTH;
 }
 
 
