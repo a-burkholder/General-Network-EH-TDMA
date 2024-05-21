@@ -74,19 +74,20 @@ void nodeFSM(){
       break;
     
     case SYNC:
-      //--for if we have the time to sync off of--//
-      if(updated){
-        global_time = time_sent.toInt(); // for cycleTime() function
-        start_clock = millis(); // for cycleTime() function
-        offset = ((int)global_time - (int)start_clock); // for cycleTime() function
-        state = WAIT;
-      }
       //--for if we are waiting for a sync message--//
-      else if(!updated){
+      if(!updated){
         if(readData()){
           time_in = cycleTime();
           updated = true;
         }
+      }
+      
+      //--for if we have the time to sync off of--//
+      else if(updated){
+        global_time = time_sent.toInt(); // for cycleTime() function
+        start_clock = millis(); // for cycleTime() function
+        offset = ((int)global_time - (int)start_clock); // for cycleTime() function
+        state = WAIT;
       }
 
       updated = false;
