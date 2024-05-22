@@ -19,24 +19,25 @@ bool is_sync = false;     // keeps track of if the last read message was a sync
 
 /* Timers */
 unsigned long transmit_time;    // time in the cycle to transmit
-unsigned long global_time = 0;  // global cycle time from the last sync message
+unsigned long receive_time;
+//unsigned long global_time = 0;  // global cycle time from the last sync message
 long offset = 0;                // offset from the node's cycle to the global cycle
-unsigned long start_clock = 0;  // the current node's equivalent time to the global cycle time
+//unsigned long start_clock = 0;  // the current node's equivalent time to the global cycle time
 unsigned long last_time;        // the time at the last time it was checked
 
 
 /* Transmition stuff */
-String incoming = "Placeholder data input string";  // holds whole input
-String data_in = "Placeholder data";                // the data coming in
-String time_sent = "1500";                          // the global cycle time coming in
-unsigned long time_in = "1500";                     // time that this node received the message, ideally same as time_sent
+String data_in;                // the data coming in
+long time_sent;                // the time the previous node sent the message
+unsigned long time_in;         // local arrival time, then converted to global arrival time, ideally the same as time_sent
+long num_syncs = 0;
+String sync_list = "";
 
 bool is_sent = false;   // checks if a message was sent this cycle
 int clock_diff;         // used for calculating overlap between nodes
 int overlap_flag;       // to hold the overlap info: 1 for behind, 2 for ok, 3 for ahead
 bool is_overlap;        // to send the state mechine to SYNC_LIST if true
 
-String data[TOTAL_NODES];
 
 void baseFSM();
 bool readData();
@@ -44,13 +45,16 @@ unsigned long cycleTime();
 
 void setup() {
   // put your setup code here, to run once:
+  transmit_time = (ID.toInt() - 1) * TIME_SLOT;
+  receive_time = transmit_time - TIME_SLOT;
   Serial.begin(9600);
-
+  Serial.setTimeout(3000);
+  Serial.println(transmit_time);
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-
+  baseFSM();
 }
 
 
@@ -66,33 +70,34 @@ void baseFSM(){
       break;
 
     case ACTIVE:
-      // read data
       if(readData()){
         //--check for overlap errors in most recent message--//
-        clock_diff = ((String)time_in).compareTo(time_sent); 
+        clock_diff = time_in - receive_time;
         if(clock_diff > ERROR){ // behind
-          overlap_flag = 1;
+          is_overlap = true;
         }
         else if (clock_diff > -ERROR){ // ok
-          overlap_flag = 2;
+          is_overlap = false;
         }
         else { // ahead
-          overlap_flag = 3; 
+          is_overlap = true; 
         }
-        data[0] = overlap_flag;
-        if(overlap_flag != "2"){
-          is_overlap = true;
-        }
+        
       }
       // check for errors
+      
+
       // parse the data and check for any overlapp errors (1 behind, 2 ok, 3 ahead)
-      for(int i = 0; i < (TOTAL_NODES-1)*3; i=i+3){
-        data[i+1] = data_in.substring(i,i+3);
-        if(data[i+1] != "2"){
+      for(int i = 4*3; i >= 1; i-=4){
+        Serial.println(data_in.substring(i-3,i));
+        if(data_in.substring(i-1,i) != "2"){
+          //add to list
+          sync_list = sync_list + data_in.substring(i-3,i-1);
+          num_syncs++;
           is_overlap = true;
         }
       }
-      
+
       // if overlap and send SYNC_LIST to adjust
       if(is_overlap){
         state = SYNC_LIST;
@@ -113,60 +118,27 @@ void baseFSM(){
 // Helper function that updates the variables that hold the data. Created to simplify code. (and improve efficency)
 // If it reads data, returns true
 bool readData(){
-  bool isMessage = false;
-
-  //--Read the data--//
-  if(Serial.available()){
-
+  if(Serial.available()){ // is there anything to read?
     String type = Serial.readStringUntil(',');
-    long in_time = Serial.parseInt();
+    time_sent = Serial.parseInt();
 
-
+    //--if data--//
     if(type == "D"){
-      String data = Serial.readString();
-      Serial.println(type);
-      Serial.println(in_time);
-      Serial.println(data);
-    }
-    else if(type == "S"){
-      long num_sync = Serial.parseInt();
-      String sync_list = Serial.readString();
-     
-      Serial.println(type);
-      Serial.println(in_time);
-      Serial.println(num_sync);
-      Serial.println(sync_list);
-    }
-    else if(type == "G"){
-  
-      Serial.println(type);
-      Serial.println(in_time);
+      data_in = Serial.readStringUntil('\n');
+      is_sync = false;
     }
 
-
-
-
-
-
-
-
-    incoming = Serial.readStringUntil('\r'); 
-    isMessage = true;
-
-    int data_idx = incoming.indexOf(',',2); //the index of the comma separating the data from the cycle time
-    time_in = incoming.substring(1,data_idx);
-    data_in = incoming.substring(data_idx + 1, incoming.length());
-    
+    Serial.readStringUntil('\r'); // clears input buffer
+    return true; // if theres a message
   }
-  Serial.flush();
-  return isMessage;
+  return false; // if no message to read
 }
 
 // cycleTime() -- Verified working
 // helper function to keep the time in the range of one cycle and incorporate the offset
 // also resets the is_sent variable so we can send a new message if we get to a new cycle
 unsigned long cycleTime(){
-  unsigned long time = (millis() + offset) % CYCLE_LENGTH;
+  unsigned long time = (millis() % CYCLE_LENGTH);
   if(last_time > time){ // checks if the clock reset and resets is_sent
     is_sent = false;
   }
