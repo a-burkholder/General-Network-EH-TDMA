@@ -53,6 +53,7 @@ void loop() {
 
 }
 
+
 // baseFSM()
 // The function that implements the states and their functionality in the base
 void baseFSM(){
@@ -85,7 +86,7 @@ void baseFSM(){
       }
       // check for errors
       // parse the data and check for any overlapp errors (1 behind, 2 ok, 3 ahead)
-      for(int i = 0, i < (TOTAL_NODES-1)*3, i=i+3){
+      for(int i = 0; i < (TOTAL_NODES-1)*3; i=i+3){
         data[i+1] = data_in.substring(i,i+3);
         if(data[i+1] != "2"){
           is_overlap = true;
@@ -116,6 +117,39 @@ bool readData(){
 
   //--Read the data--//
   if(Serial.available()){
+
+    String type = Serial.readStringUntil(',');
+    long in_time = Serial.parseInt();
+
+
+    if(type == "D"){
+      String data = Serial.readString();
+      Serial.println(type);
+      Serial.println(in_time);
+      Serial.println(data);
+    }
+    else if(type == "S"){
+      long num_sync = Serial.parseInt();
+      String sync_list = Serial.readString();
+     
+      Serial.println(type);
+      Serial.println(in_time);
+      Serial.println(num_sync);
+      Serial.println(sync_list);
+    }
+    else if(type == "G"){
+  
+      Serial.println(type);
+      Serial.println(in_time);
+    }
+
+
+
+
+
+
+
+
     incoming = Serial.readStringUntil('\r'); 
     isMessage = true;
 
