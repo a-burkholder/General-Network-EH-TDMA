@@ -23,6 +23,7 @@ unsigned long time_in;          // time that this node received the message, ide
 /* Transmition stuff */
 String data_in;                // the data coming in
 
+/* Function Headers */
 bool energyAvailible();
 void nodeFSM();
 bool readData();
@@ -40,7 +41,6 @@ void loop() {
   // put your main code here, to run repeatedly:
   nodeFSM();
 }
-
 
 // energyAvailible() // -- Verified working
 // RNG for if a node has energy or not, based on the chances of that node having energy
@@ -149,10 +149,40 @@ void nodeFSM(){
 // Helper function that updates the variables that hold the data. Created to simplify code. (and improve efficency)
 // If it reads data, returns true
 bool readData(){
-  if(Serial.available()){ // is there anything to read?
-    String type = Serial.readStringUntil(',');
-    global_time = Serial.parseInt();
+  if(Serial.available()){
+    String type1 = Serial.readStringUntil(','); // holds the type of message
+    global_time = Serial.parseInt(); // grabs the global time from sender
+    static enum { D, S, G } type;
 
+    if(type1 == "D") type = D;
+    else if(type1 == "S") type = S;
+    else type = G;
+
+    switch (type){
+      case D:
+        data_in = Serial.readStringUntil('\n');
+        is_sync = false;
+        break;
+
+      case S:
+        long num_syncs = Serial.parseInt();
+        String sync_list = Serial.readString();
+        
+        //--linear search through all node IDs--//   REPLACE WITH BINARY SEARCH EVENTUALLY
+        for(int i = 1; i <= num_syncs; i++){
+          String to_check = sync_list.substring((i*2-1), (i*2)+1);
+          if(to_check == ID){ //if this node finds it's ID on the sync list
+            is_sync = true;
+            break;
+          }
+        }
+        break;
+
+      case G:
+        is_sync = true;
+        break;
+    }
+/*
     //--if data--//
     if(type == "D"){
       data_in = Serial.readStringUntil('\n');
@@ -178,7 +208,7 @@ bool readData(){
     else if(type == "G"){
       is_sync = true;
     }
-
+*/
     Serial.readStringUntil('\r'); // clears input buffer
     return true; // if theres a message
   }
@@ -189,7 +219,7 @@ bool readData(){
 // helper function to keep the time in the range of one cycle and incorporate the offset
 // also resets the is_sent variable so we can send a new message if we get to a new cycle
 unsigned long cycleTime(){
-  unsigned long time = (millis() % CYCLE_LENGTH) + offset;
+  unsigned long time = ((millis() % CYCLE_LENGTH) + offset) % CYCLE_LENGTH;
   if(last_time > time){ // checks if the clock reset and resets is_sent
     is_sent = false;
   }
