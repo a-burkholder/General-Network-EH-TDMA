@@ -22,7 +22,7 @@ long global_time;               // the time the previous node sent the message
 unsigned long time_in;          // time that this node received the message, ideally same as global_time
 
 /* Transmition stuff */
-String data_in;                // the data coming in
+String data_in = ",E";                // the data coming in
 
 /* Function Headers */
 bool energyAvailible();
@@ -128,7 +128,7 @@ void nodeFSM(){
       else is_overlap = 4;
       String message = "D," + (String)cycleTime() + "," + ID + (String)is_overlap + data_in; // update the message
       Serial.println(message); // send the message
-      data_in = "E";
+      data_in = ",E";
       is_sent = true;
 
       // energy checking

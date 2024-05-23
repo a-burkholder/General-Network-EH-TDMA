@@ -20,7 +20,7 @@ bool updated = false;     // tracks if we need to read a time for syncing or if 
 unsigned long transmit_time;    // time in the cycle to transmit
 unsigned long receive_time;
 long offset = 0;                // offset from the node's cycle to the global cycle
-unsigned long last_time;        // the time at the last time it was checked
+unsigned long last_time = 0;        // the time at the last time it was checked
 
 
 /* Transmition stuff */
@@ -63,13 +63,14 @@ void baseFSM(){
   static enum { SYNC_ALL, ACTIVE, SYNC_LIST } state = SYNC_ALL;
   switch(state){
     case SYNC_ALL:
-      int cycle_Time = millis() % CYCLE_LENGTH;
-      Serial.println("G" + cycle_Time);// send a general sync message 
+      Serial.println("G" + cycleTime());// send a general sync message 
       state = ACTIVE;
       break;
 
     case ACTIVE:
+    Serial.println("ACTIVE");
       if(readData()){
+        Serial.println("Data read");
         time_in = cycleTime();
         //--check for overlap errors in most recent message--//
         clock_diff = time_in - receive_time;
@@ -82,28 +83,29 @@ void baseFSM(){
         else { // ahead
           is_overlap = true; 
         }
-        
-      }
-      // check for errors
+
+        // check for errors
       
 
-      // parse the data and check for any overlapp errors (1 behind, 2 ok, 3 ahead)
-      for(int i = 4*3; i >= 1; i-=4){
-        Serial.println(data_in.substring(i-3,i));
-        if(data_in.substring(i-1,i) != "2"){
-          //add to list
-          sync_list = sync_list + data_in.substring(i-3,i-1);
-          num_syncs++;
-          is_overlap = true;
+        // parse the data and check for any overlapp errors (1 behind, 2 ok, 3 ahead)
+        for(int i = (4 * 3); i >= 1; i -= 4){
+          Serial.println(data_in.substring(i - 3, i));
+          if(data_in.substring(i - 1, i) != "2"){
+            //add to list
+            sync_list = sync_list + data_in.substring(i - 3, i - 1);
+            num_syncs++;
+            is_overlap = true;
+          }
         }
-      }
 
-      // if overlap and send SYNC_LIST to adjust
-      if(is_overlap){
-        state = SYNC_LIST;
+        // if overlap and send SYNC_LIST to adjust
+        if(is_overlap){
+          state = SYNC_LIST;
+        }
+          
+          // if all nodes dead, SYNCA
       }
-        
-        // if all nodes dead, SYNCA
+      
       break;
       
     case SYNC_LIST:
@@ -123,15 +125,17 @@ bool readData(){
     time_sent = Serial.parseInt();
     Serial.readStringUntil(',');
     data_in = ",";
-
+    Serial.println(type);
     //--if data--//
     if(type == "D"){
       while(Serial.available()){
         String p_data = Serial.readStringUntil(',');
+        Serial.println(p_data);
         if(p_data == NULL){
           break;
         }
         int data_idx = p_data.substring(0,2).toInt();
+        Serial.println(data_idx);
         data[data_idx-1] = p_data;
         data_in = data_in + "," + p_data;
       }
@@ -147,7 +151,7 @@ bool readData(){
 // helper function to keep the time in the range of one cycle and incorporate the offset
 // also resets the is_sent variable so we can send a new message if we get to a new cycle
 unsigned long cycleTime(){
-  unsigned long time = (millis() % CYCLE_LENGTH);
+  unsigned long time = millis() % CYCLE_LENGTH;
   if(last_time > time){ // checks if the clock reset and resets is_sent
     is_sent = false;
   }
