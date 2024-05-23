@@ -128,7 +128,7 @@ void nodeFSM(){
       else is_overlap = 4;
       String message = "D," + (String)cycleTime() + "," + ID + (String)is_overlap + data_in; // update the message
       Serial.println(message); // send the message
-      data_in = ",E";
+      data_in = ",E,";
       is_sent = true;
 
       // energy checking

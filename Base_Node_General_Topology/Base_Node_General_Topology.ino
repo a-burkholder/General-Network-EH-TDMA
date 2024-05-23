@@ -1,7 +1,7 @@
 
 
 /* Constants and assumptions*/
-const int TOTAL_NODES = 5;                                  // Total number of nodes in the network
+const int TOTAL_NODES = 10;                                  // Total number of nodes in the network
 const int TIME_SLOT = 500;                                  // amount of time per slot in milliseconds (ms) 10^-3
 const unsigned long CYCLE_LENGTH = TOTAL_NODES*TIME_SLOT;   // total length of one cycle
 const int ERROR = 60;                                       // Transmission time error threshold
@@ -70,7 +70,11 @@ void baseFSM(){
     case ACTIVE:
     Serial.println("ACTIVE");
       if(readData()){
-        Serial.println("Data read");
+        Serial.println("gotem");
+        for(String i: data)
+          Serial.println(i);
+        Serial.println(data_in);
+
         time_in = cycleTime();
         //--check for overlap errors in most recent message--//
         clock_diff = time_in - receive_time;
@@ -88,7 +92,7 @@ void baseFSM(){
       
 
         // parse the data and check for any overlapp errors (1 behind, 2 ok, 3 ahead)
-        for(int i = (4 * 3); i >= 1; i -= 4){
+        for(int i = data_in.length(); i >= 1; i -= 4){
           Serial.println(data_in.substring(i - 3, i));
           if(data_in.substring(i - 1, i) != "2"){
             //add to list
@@ -100,11 +104,12 @@ void baseFSM(){
 
         // if overlap and send SYNC_LIST to adjust
         if(is_overlap){
-          state = SYNC_LIST;
+          //state = SYNC_LIST;
         }
           
           // if all nodes dead, SYNCA
       }
+      
       
       break;
       
@@ -124,25 +129,24 @@ bool readData(){
     String type = Serial.readStringUntil(',');
     time_sent = Serial.parseInt();
     Serial.readStringUntil(',');
-    data_in = ",";
-    Serial.println(type);
     //--if data--//
     if(type == "D"){
-      while(Serial.available()){
+      data_in = "";
+      for(int i = 0; i < TOTAL_NODES; i++ ){
+        data[i] = "E";
+      }
+      while(true){
         String p_data = Serial.readStringUntil(',');
-        Serial.println(p_data);
-        if(p_data == NULL){
-          break;
+        if(p_data == "E"){
+          Serial.readStringUntil('\n');         
+          break;// D,1234,102,082,062,052,032,012,E,
         }
         int data_idx = p_data.substring(0,2).toInt();
-        Serial.println(data_idx);
         data[data_idx-1] = p_data;
         data_in = data_in + "," + p_data;
       }
     }
-
-    Serial.readStringUntil('\r'); // clears input buffer
-    return true; // if theres a message
+    return true;   
   }
   return false; // if no message to read
 }
