@@ -14,15 +14,12 @@ const int ENERGY_CHANCE = 80;                               // energy harvest ra
 bool led_state = false;   // unused
 bool trans = false;       // unused
 bool updated = false;     // tracks if we need to read a time for syncing or if we already did that
-bool is_sync = false;     // keeps track of if the last read message was a sync
 
 
 /* Timers */
 unsigned long transmit_time;    // time in the cycle to transmit
 unsigned long receive_time;
-//unsigned long global_time = 0;  // global cycle time from the last sync message
 long offset = 0;                // offset from the node's cycle to the global cycle
-//unsigned long start_clock = 0;  // the current node's equivalent time to the global cycle time
 unsigned long last_time;        // the time at the last time it was checked
 
 
@@ -32,11 +29,13 @@ long time_sent;                // the time the previous node sent the message
 unsigned long time_in;         // local arrival time, then converted to global arrival time, ideally the same as time_sent
 long num_syncs = 0;
 String sync_list = "";
+String data[TOTAL_NODES];
 
 bool is_sent = false;   // checks if a message was sent this cycle
 int clock_diff;         // used for calculating overlap between nodes
 int overlap_flag;       // to hold the overlap info: 1 for behind, 2 for ok, 3 for ahead
 bool is_overlap;        // to send the state mechine to SYNC_LIST if true
+
 
 
 void baseFSM();
@@ -71,6 +70,7 @@ void baseFSM(){
 
     case ACTIVE:
       if(readData()){
+        time_in = cycleTime();
         //--check for overlap errors in most recent message--//
         clock_diff = time_in - receive_time;
         if(clock_diff > ERROR){ // behind
@@ -121,11 +121,20 @@ bool readData(){
   if(Serial.available()){ // is there anything to read?
     String type = Serial.readStringUntil(',');
     time_sent = Serial.parseInt();
+    Serial.readStringUntil(',');
+    data_in = ",";
 
     //--if data--//
     if(type == "D"){
-      data_in = Serial.readStringUntil('\n');
-      is_sync = false;
+      while(Serial.available()){
+        String p_data = Serial.readStringUntil(',');
+        if(p_data == NULL){
+          break;
+        }
+        int data_idx = p_data.substring(0,2).toInt();
+        data[data_idx-1] = p_data;
+        data_in = data_in + "," + p_data;
+      }
     }
 
     Serial.readStringUntil('\r'); // clears input buffer
