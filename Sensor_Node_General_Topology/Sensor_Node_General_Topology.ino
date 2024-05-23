@@ -4,36 +4,24 @@
 const int TOTAL_NODES = 5;                                  // Total number of nodes in the network
 const int TIME_SLOT = 500;                                  // amount of time per slot in milliseconds (ms) 10^-3
 const unsigned long CYCLE_LENGTH = TOTAL_NODES*TIME_SLOT;   // total length of one cycle
-const int ERROR = 300;                                       // Transmission time error threshold
+const int ERROR = 60;                                       // Transmission time error threshold
 const String ID = "04";                                     // Each node knows its ID based on assumption
-const int ENERGY_CHANCE = 1000;                               // energy harvest rate
-
-
+const int ENERGY_CHANCE = 1000;                             // energy harvest rate
 
 /* FLAGS... and stuff*/
-bool led_state = false;   // unused
-bool trans = false;       // unused
 bool updated = false;     // tracks if we need to read a time for syncing or if we already did that
 bool is_sync = false;     // keeps track of if the last read message was a sync
-
+bool is_sent = false;     // checks if a message was sent this cycle
 
 /* Timers */
 unsigned long transmit_time;    // time in the cycle to transmit
-unsigned long receive_time;
-//unsigned long global_time = 0;  // global cycle time from the last sync message
 long offset = 0;                // offset from the node's cycle to the global cycle
-//unsigned long start_clock = 0;  // the current node's equivalent time to the global cycle time
 unsigned long last_time;        // the time at the last time it was checked
-
+long global_time;               // the time the previous node sent the message
+unsigned long time_in;          // time that this node received the message, ideally same as global_time
 
 /* Transmition stuff */
 String data_in;                // the data coming in
-long time_sent;                // the time the previous node sent the message
-unsigned long time_in;         // time that this node received the message, ideally same as time_sent
-
-bool is_sent = false;   // checks if a message was sent this cycle
-int clock_diff;         // used for calculating overlap between nodes
-int is_overlap;         // to hold the overlap info: 1 for behind, 2 for ok, 3 for ahead
 
 bool energyAvailible();
 void nodeFSM();
@@ -43,7 +31,6 @@ unsigned long cycleTime();
 void setup() {
   // put your setup code here, to run once:
   transmit_time = (ID.toInt() - 1) * TIME_SLOT;
-  receive_time = transmit_time - TIME_SLOT;
   Serial.begin(9600);
   Serial.setTimeout(3000);
   Serial.println(transmit_time);
@@ -89,7 +76,7 @@ void nodeFSM(){
       
       //--for if we have the time to sync off of--//
       if(updated){
-        offset = time_sent - (millis() % CYCLE_LENGTH); // for cycleTime() function
+        offset = global_time - time_in; // for cycleTime() function
         time_in = time_in + offset;
         state = WAIT;
         updated = false;
@@ -121,12 +108,14 @@ void nodeFSM(){
 
     case ACTIVE: // -- Verified working
       //--check for overlap errors--//
-      clock_diff = time_in - receive_time; 
-      Serial.println(receive_time);
+      int clock_diff =  time_in - global_time; 
+      Serial.println(global_time);
       Serial.println(time_in);
       Serial.println(clock_diff);
       Serial.println(offset);
       Serial.println(cycleTime());
+
+      int is_overlap;
       if(clock_diff > ERROR){ // behind
         is_overlap = 1;
       }
@@ -162,7 +151,7 @@ void nodeFSM(){
 bool readData(){
   if(Serial.available()){ // is there anything to read?
     String type = Serial.readStringUntil(',');
-    time_sent = Serial.parseInt();
+    global_time = Serial.parseInt();
 
     //--if data--//
     if(type == "D"){
