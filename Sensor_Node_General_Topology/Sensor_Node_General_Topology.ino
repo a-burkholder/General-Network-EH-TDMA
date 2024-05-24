@@ -1,12 +1,13 @@
 
 
 /* Constants and assumptions*/
-const int TOTAL_NODES = 6;                                  // Total number of sensor nodes in the network
+const int TOTAL_NODES = 10;                                 // Total number of sensor nodes in the network
 const int TIME_SLOT = 500;                                  // amount of time per slot in milliseconds (ms) 10^-3
-const unsigned long CYCLE_LENGTH = TOTAL_NODES*TIME_SLOT;   // total length of one cycle
-const int ERROR = 60;                                       // Transmission time error threshold
-const String ID = "04";                                     // Each node knows its ID based on assumption
+const unsigned long ERROR = 60;                             // Transmission time error threshold
+const String ID = "07";                                     // Each node knows its ID based on assumption
 const int ENERGY_CHANCE = 1000;                             // energy harvest rate
+const unsigned long CYCLE_LENGTH = TOTAL_NODES*TIME_SLOT;   // total length of one cycle
+unsigned long TRANSMIT_TIME = (ID.toInt() - 1) * TIME_SLOT; // time in the cycle to transmit TRANSMIT_TIME
 
 /* FLAGS... and stuff*/
 bool updated = false;       // tracks if we need to read a time for syncing or if we already did that
@@ -15,44 +16,30 @@ bool is_sent = false;       // checks if a message was sent this cycle
 bool overlap_check = false; // we only check overlap if it gets a data packet
 
 /* Timers */
-unsigned long transmit_time;    // time in the cycle to transmit
-long offset = 0;                // offset from the node's cycle to the global cycle
-unsigned long last_time;        // the time at the last time it was checked
-long global_time;               // the time the previous node sent the message
-unsigned long time_in;          // time that this node received the message, ideally same as global_time
+long offset = 0;                    // offset from the node's cycle to the global cycle
+unsigned long last_time = 0;        // the time at the last time it was checked
+long global_time = 0;               // the time the previous node sent the message
+unsigned long time_in = 0;          // time that this node received the message
+unsigned long time_in_U = 0;        // time_in but updated to global time
 
 /* Transmition stuff */
-String data_in = ",E";                // the data coming in
+String data_in = ",E,";                // the data coming in
 
-/* Function Headers */
-bool energyAvailible();
+/* Function headers */
 void nodeFSM();
+bool energyAvailible();
 bool readData();
 unsigned long cycleTime();
 
 void setup() {
   // put your setup code here, to run once:
-  transmit_time = (ID.toInt() - 1) * TIME_SLOT;
   Serial.begin(9600);
   Serial.setTimeout(3000);
-  Serial.println(CYCLE_LENGTH);
-  Serial.println(transmit_time);
-  Serial.println(TOTAL_NODES);
-  Serial.println(ID);
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
   nodeFSM();
-}
-
-// energyAvailible() // -- Verified working
-// RNG for if a node has energy or not, based on the chances of that node having energy
-bool energyAvailible(){
-  if(random(0,100) <= ENERGY_CHANCE){
-    return true;
-  } 
-  else return false;
 }
 
 // nodeFSM()
@@ -61,9 +48,22 @@ void nodeFSM(){
   static enum { DEAD, SYNC, WAIT, ACTIVE } state = DEAD;
   switch (state) {
     case DEAD: // -- Verified working
-    Serial.println("DEAD");
+      Serial.println("DEAD");
       if(energyAvailible()) {
+        //--reset flags--//
         updated = false;
+        is_sync = false;
+        is_sent = false;
+        overlap_check = false;
+        //--reset timers--//
+        offset = 0;
+        last_time = 0;
+        global_time = 0;
+        time_in = 0;
+        time_in_U = 0;
+        //--reset data--//
+        data_in = ",E,";                
+        // to sync
         state = SYNC;
         Serial.println("SYNC");
       }
@@ -71,67 +71,55 @@ void nodeFSM(){
     
     case SYNC: // -- Verified working
       //--for if we are waiting for a message to get time from--//
-      if(!updated){
-        if(readData()){
-          time_in = millis() % CYCLE_LENGTH;
-          updated = true;
-        }
+      if(!updated && readData()){
+        is_sent = false;
+        updated = true;
       }
       
       //--for if we have the time to sync off of--//
       if(updated){
-        offset = global_time - time_in; // for cycleTime() function
-        time_in = time_in + offset;
+        offset = (global_time - time_in) % CYCLE_LENGTH; 
+        time_in_U = (time_in + offset) % CYCLE_LENGTH;
         state = WAIT;
-        updated = false;
+        updated = false; // reset flag
         Serial.println("WAIT");
       }
       break;
 
     case WAIT: // -- Verified working
       //--if in time slot--//
-      if(cycleTime() >= transmit_time && !is_sent){
-        state = ACTIVE;
+      if(cycleTime() < TRANSMIT_TIME + ERROR && cycleTime() > TRANSMIT_TIME && !is_sent){ 
         Serial.println("ACTIVE");
-        break;
+        state = ACTIVE; 
       }
+      
       //--if not in time slot--//
-      else{
-        
-        if(readData()){
-          updated = true;
-          time_in = millis() % CYCLE_LENGTH;
-          if (is_sync){
-            state = SYNC;
-            Serial.println("SYNC");
-            break;
-          }
+      else if(readData()){
+        updated = true;
+        time_in_U = cycleTime();
+        if (is_sync){
+          state = SYNC;
+          Serial.println("SYNC");
+          break;
         }
-      }  
+      }
       break;
 
     case ACTIVE: // -- Verified working
       //--check for overlap errors--//
-      int clock_diff =  time_in - global_time; 
-      int is_overlap;
+      int clock_diff =  time_in_U - global_time; 
+      int is_overlap = 2; // base case, all good
       if(overlap_check){
-        if(clock_diff > ERROR){ // behind
-          is_overlap = 1;
-        }
-        else if (clock_diff > -ERROR){ // ok
-          is_overlap = 2;
-        }
-        else { // ahead
-          is_overlap = 3; 
-        }
+        if(clock_diff > ERROR){ is_overlap = 1; }        // behind
+        else if (clock_diff > -ERROR){ is_overlap = 3; } // ahead
       }
-      else is_overlap = 4;
-      String message = "D," + (String)cycleTime() + "," + ID + (String)is_overlap + data_in; // update the message
-      Serial.println(message); // send the message
+      //--make and send the data--//
+      String message = "D," + (String)cycleTime() + "," + ID + (String)is_overlap + data_in;
+      Serial.println(message);
+      //--reset--//
       data_in = ",E,";
       is_sent = true;
-
-      // energy checking
+      //--energy checking--//
       if(energyAvailible()){
         state = WAIT;
         Serial.println("WAIT");
@@ -145,27 +133,37 @@ void nodeFSM(){
   }
 }
 
+// energyAvailible() // -- Verified working
+// RNG for if a node has energy or not, based on the chances of that node having energy
+bool energyAvailible(){
+  if(random(0,100) <= ENERGY_CHANCE){
+    return true;
+  } 
+  else return false;
+}
+
 // readData() // -- Verified working
 // Helper function that updates the variables that hold the data. Created to simplify code. (and improve efficency)
 // If it reads data, returns true
 bool readData(){
   if(Serial.available()){
-    String type1 = Serial.readStringUntil(','); // holds the type of message
-    global_time = Serial.parseInt(); // grabs the global time from sender
+    String type1 = Serial.readStringUntil(','); // grabs the type of message
+    global_time = Serial.parseInt();            // grabs the global time from sender
+    time_in = millis() % CYCLE_LENGTH;          // grabs the nodal time of receiving
+    
     static enum { D, S, G } type;
-
     if(type1 == "D") type = D;
     else if(type1 == "S") type = S;
     else type = G;
 
     switch (type){
-      case D:
+      case D: // data
         data_in = Serial.readStringUntil('\n');
         overlap_check = true;
         is_sync = false;
         break;
 
-      case S:
+      case S: // sync list
         long num_syncs = Serial.parseInt();
         String sync_list = Serial.readString();
         overlap_check = false;
@@ -180,38 +178,12 @@ bool readData(){
         }
         break;
 
-      case G:
+      case G: // general sync
         is_sync = true;
         overlap_check = false;
         break;
     }
-/*
-    //--if data--//
-    if(type == "D"){
-      data_in = Serial.readStringUntil('\n');
-      is_sync = false;
-    }
 
-    //--if targeted sync--// 
-    else if(type == "S"){
-      long num_syncs = Serial.parseInt();
-      String sync_list = Serial.readString();
-      
-      //--linear search through all node IDs--//   REPLACE WITH BINARY SEARCH EVENTUALLY
-      for(int i = 1; i <= num_syncs; i++){
-        String to_check = sync_list.substring((i*2-1), (i*2)+1);
-        if(to_check == ID){ //if this node finds it's ID on the sync list
-          is_sync = true;
-          break;
-        }
-      }
-    }
-
-    //--if general sync--//
-    else if(type == "G"){
-      is_sync = true;
-    }
-*/
     Serial.readStringUntil('\r'); // clears input buffer
     return true; // if theres a message
   }
@@ -223,9 +195,7 @@ bool readData(){
 // also resets the is_sent variable so we can send a new message if we get to a new cycle
 unsigned long cycleTime(){
   unsigned long time = ((millis() % CYCLE_LENGTH) + offset) % CYCLE_LENGTH;
-  if(last_time > time){ // checks if the clock reset and resets is_sent
-    is_sent = false;
-  }
+  if(last_time > time){ is_sent = false; } // checks if the clock reset and resets is_sent
   last_time = time; // for next time we call the function
   return time;
 }
