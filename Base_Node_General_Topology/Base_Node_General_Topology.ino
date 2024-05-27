@@ -105,6 +105,7 @@ void baseFSM(){
     case SYNC_LIST:
       // send a sync to specific nodes
       Serial.println("A,S," + (String)cycleTime() + "," + (String)num_syncs + "," + sync_list);
+      sync_list = "";
       state = ACTIVE;
       is_overlap = false;
       num_syncs = 0;

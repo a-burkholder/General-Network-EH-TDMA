@@ -5,10 +5,10 @@ const String ZONE = "1";
 const int TOTAL_NODES = 2;                                 // Total number of sensor nodes in the network
 const int TIME_SLOT = 500;                                  // amount of time per slot in milliseconds (ms) 10^-3
 const unsigned long ERROR = 60;                             // Transmission time error threshold
-const String ID = "02";                                     // Each node knows its ID based on assumption
+const String ID = "01";                                     // Each node knows its ID based on assumption
 const int ENERGY_CHANCE = 1000;                             // energy harvest rate
 const unsigned long CYCLE_LENGTH = (TOTAL_NODES+1)*TIME_SLOT;   // total length of one cycle
-unsigned long TRANSMIT_TIME = (ID.toInt() - 1) * TIME_SLOT; // time in the cycle to transmit TRANSMIT_TIME
+unsigned long TRANSMIT_TIME = (ID.toInt()) * TIME_SLOT; // time in the cycle to transmit TRANSMIT_TIME
 
 /* FLAGS... and stuff*/
 bool updated = false;       // tracks if we need to read a time for syncing or if we already did that
@@ -98,6 +98,7 @@ void nodeFSM(){
         time_in_U = cycleTime();
         if (is_sync){
           state = SYNC;
+          Serial.println("SYNC");
           break;
         }
       }
@@ -165,6 +166,7 @@ bool readData(){
           break;
 
         case S: // sync list
+          Serial.println("here");
           long num_syncs = Serial.parseInt();
           String sync_list = Serial.readString();
           overlap_check = false;
