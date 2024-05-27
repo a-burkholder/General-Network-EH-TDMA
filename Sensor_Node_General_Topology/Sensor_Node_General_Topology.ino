@@ -7,7 +7,7 @@ const int TIME_SLOT = 500;                                  // amount of time pe
 const unsigned long ERROR = 60;                             // Transmission time error threshold
 const String ID = "02";                                     // Each node knows its ID based on assumption
 const int ENERGY_CHANCE = 1000;                             // energy harvest rate
-const unsigned long CYCLE_LENGTH = TOTAL_NODES*TIME_SLOT+1;   // total length of one cycle
+const unsigned long CYCLE_LENGTH = (TOTAL_NODES+1)*TIME_SLOT;   // total length of one cycle
 unsigned long TRANSMIT_TIME = (ID.toInt() - 1) * TIME_SLOT; // time in the cycle to transmit TRANSMIT_TIME
 
 /* FLAGS... and stuff*/
@@ -36,11 +36,13 @@ void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
   Serial.setTimeout(3000);
+  offset = 250;
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
   nodeFSM();
+  
 }
 
 // nodeFSM()
@@ -87,7 +89,7 @@ void nodeFSM(){
 
     case WAIT: // -- Verified working
       //--if in time slot--//
-      if(cycleTime() < TRANSMIT_TIME + ERROR && cycleTime() > TRANSMIT_TIME && !is_sent){ 
+      if(cycleTime() == TRANSMIT_TIME && !is_sent){ 
         state = ACTIVE; 
       }
       
@@ -146,9 +148,10 @@ bool readData(){
   if(Serial.available()){
     String zone = Serial.readStringUntil(',');
     if(zone == "A" || zone == ZONE){
+      time_in = millis() % CYCLE_LENGTH;          // grabs the nodal time of receiving
       String type1 = Serial.readStringUntil(','); // grabs the type of message
       global_time = Serial.parseInt();            // grabs the global time from sender
-      time_in = millis() % CYCLE_LENGTH;          // grabs the nodal time of receiving
+      
       
       static enum { D, S, G } type;
       if(type1 == "D") type = D;

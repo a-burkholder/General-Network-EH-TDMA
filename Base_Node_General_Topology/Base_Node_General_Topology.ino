@@ -3,16 +3,16 @@
 /* Constants and assumptions*/
 const int TOTAL_NODES = 2;                                 // Total number of nodes in the network
 const int TIME_SLOT = 500;                                  // amount of time per slot in milliseconds (ms) 10^-3
-const unsigned long CYCLE_LENGTH = TOTAL_NODES * TIME_SLOT+1; // total length of one cycle
+const unsigned long CYCLE_LENGTH = (TOTAL_NODES+1) * TIME_SLOT; // total length of one cycle
 const int ERROR = 60;                                       // Transmission time error threshold
-const int ENERGY_CHANCE = 80;                               // energy harvest rate
+const int ENERGY_CHANCE = 100;                               // energy harvest rate
 
 
 
 /* FLAGS... and stuff*/
 bool updated = false;              // tracks if we need to read a time for syncing or if we already did that
 bool is_sent = false;              // checks if a message was sent this cycle
-bool is_overlap = false;                   // to send the state mechine to SYNC_LIST if true          
+bool is_overlap = false;           // to send the state mechine to SYNC_LIST if true          
 int overlap_flag;                  // to hold the overlap info: 1 for behind, 2 for ok, 3 for ahead
 
 
@@ -64,12 +64,8 @@ void baseFSM(){
     case ACTIVE:
       if(readData()){
         
-        Serial.println("Data:");
-        for(String i: data)
-          Serial.println(i);
         Serial.println("Data in = " + data_in);
-        
-
+      
         // parse the data and check for any overlapp errors (1 behind, 2 ok, 3 ahead)
         sync_list = "";
         for(int i = data_in.length(); i >= 1; i -= 4){
@@ -106,7 +102,7 @@ void baseFSM(){
       
     case SYNC_LIST:
       // send a sync to specific nodes
-      Serial.println("A,S," + (String)cycleTime() + "," + sync_list);
+      Serial.println("A,S," + (String)cycleTime() + "," + (String)num_syncs + "," + sync_list);
       state = ACTIVE;
       is_overlap = false;
       break;
@@ -118,6 +114,7 @@ void baseFSM(){
 // If it reads data, returns true
 bool readData(){
   if(Serial.available()){ // is there anything to read?
+    Serial.println(cycleTime());
     time_in = cycleTime();
     String type = Serial.readStringUntil(',');
     time_sent = Serial.parseInt();
