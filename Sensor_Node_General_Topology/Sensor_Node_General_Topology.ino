@@ -80,7 +80,7 @@ void nodeFSM(){
       
       //--for if we have the time to sync off of--//
       if(updated){
-        offset = (global_time - time_in) % CYCLE_LENGTH; 
+        offset = global_time - time_in; 
         time_in_U = (time_in + offset) % CYCLE_LENGTH;
         state = WAIT;
         updated = false; // reset flag
@@ -197,10 +197,10 @@ bool readData(){
 // helper function to keep the time in the range of one cycle and incorporate the offset
 // also resets the is_sent variable so we can send a new message if we get to a new cycle
 unsigned long cycleTime(){
-  unsigned long time = ((millis() % CYCLE_LENGTH) + offset) % CYCLE_LENGTH;
+  long time = ((long)(millis() % CYCLE_LENGTH) + offset) % (long)CYCLE_LENGTH;
   if(last_time > time){ is_sent = false; } // checks if the clock reset and resets is_sent
   last_time = time; // for next time we call the function
-  return time;
+  return (unsigned long)time;
 }
 
 
