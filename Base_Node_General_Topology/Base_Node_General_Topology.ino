@@ -1,9 +1,9 @@
 
 
 /* Constants and assumptions*/
-const int TOTAL_NODES = 10;                                 // Total number of nodes in the network
+const int TOTAL_NODES = 2;                                 // Total number of nodes in the network
 const int TIME_SLOT = 500;                                  // amount of time per slot in milliseconds (ms) 10^-3
-const unsigned long CYCLE_LENGTH = TOTAL_NODES * TIME_SLOT; // total length of one cycle
+const unsigned long CYCLE_LENGTH = TOTAL_NODES * TIME_SLOT+1; // total length of one cycle
 const int ERROR = 60;                                       // Transmission time error threshold
 const int ENERGY_CHANCE = 80;                               // energy harvest rate
 
@@ -57,16 +57,18 @@ void baseFSM(){
   static enum { SYNC_ALL, ACTIVE, SYNC_LIST } state = SYNC_ALL;
   switch(state){
     case SYNC_ALL:
-      Serial.println("G," + (String)cycleTime());// send a general sync message 
+      Serial.println("A,G," + (String)cycleTime());// send a general sync message 
       state = ACTIVE;
       break;
 
     case ACTIVE:
       if(readData()){
+        
         Serial.println("Data:");
         for(String i: data)
           Serial.println(i);
         Serial.println("Data in = " + data_in);
+        
 
         // parse the data and check for any overlapp errors (1 behind, 2 ok, 3 ahead)
         sync_list = "";
@@ -104,7 +106,7 @@ void baseFSM(){
       
     case SYNC_LIST:
       // send a sync to specific nodes
-      Serial.println("S," + (String)cycleTime() + "," + sync_list);
+      Serial.println("A,S," + (String)cycleTime() + "," + sync_list);
       state = ACTIVE;
       is_overlap = false;
       break;

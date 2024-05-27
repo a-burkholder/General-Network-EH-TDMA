@@ -1,12 +1,13 @@
 
 
 /* Constants and assumptions*/
-const int TOTAL_NODES = 10;                                 // Total number of sensor nodes in the network
+const String ZONE = "1";
+const int TOTAL_NODES = 2;                                 // Total number of sensor nodes in the network
 const int TIME_SLOT = 500;                                  // amount of time per slot in milliseconds (ms) 10^-3
 const unsigned long ERROR = 60;                             // Transmission time error threshold
-const String ID = "07";                                     // Each node knows its ID based on assumption
+const String ID = "02";                                     // Each node knows its ID based on assumption
 const int ENERGY_CHANCE = 1000;                             // energy harvest rate
-const unsigned long CYCLE_LENGTH = TOTAL_NODES*TIME_SLOT;   // total length of one cycle
+const unsigned long CYCLE_LENGTH = TOTAL_NODES*TIME_SLOT+1;   // total length of one cycle
 unsigned long TRANSMIT_TIME = (ID.toInt() - 1) * TIME_SLOT; // time in the cycle to transmit TRANSMIT_TIME
 
 /* FLAGS... and stuff*/
@@ -48,7 +49,6 @@ void nodeFSM(){
   static enum { DEAD, SYNC, WAIT, ACTIVE } state = DEAD;
   switch (state) {
     case DEAD: // -- Verified working
-      Serial.println("DEAD");
       if(energyAvailible()) {
         //--reset flags--//
         updated = false;
@@ -82,14 +82,12 @@ void nodeFSM(){
         time_in_U = (time_in + offset) % CYCLE_LENGTH;
         state = WAIT;
         updated = false; // reset flag
-        Serial.println("WAIT");
       }
       break;
 
     case WAIT: // -- Verified working
       //--if in time slot--//
       if(cycleTime() < TRANSMIT_TIME + ERROR && cycleTime() > TRANSMIT_TIME && !is_sent){ 
-        Serial.println("ACTIVE");
         state = ACTIVE; 
       }
       
@@ -99,7 +97,6 @@ void nodeFSM(){
         time_in_U = cycleTime();
         if (is_sync){
           state = SYNC;
-          Serial.println("SYNC");
           break;
         }
       }
@@ -122,7 +119,6 @@ void nodeFSM(){
       //--energy checking--//
       if(energyAvailible()){
         state = WAIT;
-        Serial.println("WAIT");
         break;
       }
       else {
@@ -145,47 +141,51 @@ bool energyAvailible(){
 // readData() // -- Verified working
 // Helper function that updates the variables that hold the data. Created to simplify code. (and improve efficency)
 // If it reads data, returns true
+// Test messages A,G,1234    1,D,1234,012,E,     A,S,1234,02,0102
 bool readData(){
   if(Serial.available()){
-    String type1 = Serial.readStringUntil(','); // grabs the type of message
-    global_time = Serial.parseInt();            // grabs the global time from sender
-    time_in = millis() % CYCLE_LENGTH;          // grabs the nodal time of receiving
-    
-    static enum { D, S, G } type;
-    if(type1 == "D") type = D;
-    else if(type1 == "S") type = S;
-    else type = G;
+    String zone = Serial.readStringUntil(',');
+    if(zone == "A" || zone == ZONE){
+      String type1 = Serial.readStringUntil(','); // grabs the type of message
+      global_time = Serial.parseInt();            // grabs the global time from sender
+      time_in = millis() % CYCLE_LENGTH;          // grabs the nodal time of receiving
+      
+      static enum { D, S, G } type;
+      if(type1 == "D") type = D;
+      else if(type1 == "S") type = S;
+      else type = G;
 
-    switch (type){
-      case D: // data
-        data_in = Serial.readStringUntil('\n');
-        overlap_check = true;
-        is_sync = false;
-        break;
+      switch (type){
+        case D: // data
+          data_in = Serial.readStringUntil('\n');
+          overlap_check = true;
+          is_sync = false;
+          break;
 
-      case S: // sync list
-        long num_syncs = Serial.parseInt();
-        String sync_list = Serial.readString();
-        overlap_check = false;
-        
-        //--linear search through all node IDs--//   REPLACE WITH BINARY SEARCH EVENTUALLY
-        for(int i = 1; i <= num_syncs; i++){
-          String to_check = sync_list.substring((i*2-1), (i*2)+1);
-          if(to_check == ID){ //if this node finds it's ID on the sync list
-            is_sync = true;
-            break;
+        case S: // sync list
+          long num_syncs = Serial.parseInt();
+          String sync_list = Serial.readString();
+          overlap_check = false;
+          
+          //--linear search through all node IDs--//   REPLACE WITH BINARY SEARCH EVENTUALLY
+          for(int i = 1; i <= num_syncs; i++){
+            String to_check = sync_list.substring((i*2-1), (i*2)+1);
+            if(to_check == ID){ //if this node finds it's ID on the sync list
+              is_sync = true;
+              break;
+            }
           }
-        }
-        break;
+          break;
 
-      case G: // general sync
-        is_sync = true;
-        overlap_check = false;
-        break;
+        case G: // general sync
+          is_sync = true;
+          overlap_check = false;
+          break;
+      }
+
+      Serial.readStringUntil('\r'); // clears input buffer
+      return true; // if theres a message
     }
-
-    Serial.readStringUntil('\r'); // clears input buffer
-    return true; // if theres a message
   }
   return false; // if no message to read
 }
