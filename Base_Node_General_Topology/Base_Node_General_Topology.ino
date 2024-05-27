@@ -64,7 +64,7 @@ void baseFSM(){
     case ACTIVE:
       if(readData()){
         
-        Serial.println("Data in = " + data_in);
+        Serial.println("time in = " + (String)time_in);
       
         // parse the data and check for any overlapp errors (1 behind, 2 ok, 3 ahead)
         sync_list = "";
@@ -117,7 +117,6 @@ void baseFSM(){
 // If it reads data, returns true
 bool readData(){
   if(Serial.available()){ // is there anything to read?
-    Serial.println(cycleTime());
     time_in = cycleTime();
     String type = Serial.readStringUntil(',');
     time_sent = Serial.parseInt();
