@@ -82,9 +82,11 @@ void baseFSM(){
         if(clock_diff > ERROR){ // behind
           sync_list = sync_list + data_in.substring(1,3);
           is_overlap = true;
+          num_syncs++;
         }
         else if (clock_diff < -ERROR){ // ahead
           is_overlap = true; 
+          num_syncs++;
           sync_list = sync_list + data_in.substring(1,3);
         }
         
@@ -105,6 +107,7 @@ void baseFSM(){
       Serial.println("A,S," + (String)cycleTime() + "," + (String)num_syncs + "," + sync_list);
       state = ACTIVE;
       is_overlap = false;
+      num_syncs = 0;
       break;
   }
 }
