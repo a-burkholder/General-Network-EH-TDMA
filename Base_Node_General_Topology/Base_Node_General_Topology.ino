@@ -2,10 +2,10 @@
 
 /* Constants and assumptions*/
 const int TOTAL_NODES = 2;                                 // Total number of nodes in the network
-const int TIME_SLOT = 500;                                  // amount of time per slot in milliseconds (ms) 10^-3
+const int TIME_SLOT = 300;                                  // amount of time per slot in milliseconds (ms) 10^-3
 const unsigned long CYCLE_LENGTH = (TOTAL_NODES+1) * TIME_SLOT; // total length of one cycle
 const int ERROR = 60;                                       // Transmission time error threshold
-const int ENERGY_CHANCE = 100;                               // energy harvest rate
+const int ENERGY_CHANCE = 80;                               // energy harvest rate
 
 
 
@@ -63,11 +63,10 @@ void baseFSM(){
 
     case ACTIVE:
       if(readData()){
-        
-        Serial.println("time in = " + (String)time_in);
-      
+        Serial.println("time in = " + (String)time_in + ",");
         // parse the data and check for any overlapp errors (1 behind, 2 ok, 3 ahead)
         sync_list = "";
+        
         for(int i = data_in.length(); i >= 1; i -= 4){
           if(data_in.substring(i - 1, i) != "2"){
             //add to list
@@ -76,14 +75,15 @@ void baseFSM(){
             is_overlap = true;
           }
         }
-
+        
         //--check for overlap errors in most recent message--//
-        clock_diff = time_in - time_sent;
+        clock_diff = abs((long)time_in - time_sent);
         if(clock_diff > ERROR){ // behind
           sync_list = sync_list + data_in.substring(1,3);
           is_overlap = true;
           num_syncs++;
         }
+        
         else if (clock_diff < -ERROR){ // ahead
           is_overlap = true; 
           num_syncs++;
@@ -117,13 +117,13 @@ void baseFSM(){
 // Helper function that updates the variables that hold the data. Created to simplify code. (and improve efficency)
 // If it reads data, returns true
 bool readData(){
-  if(Serial.available()){ // is there anything to read?
+  if(Serial.available() > 0){ // is there anything to read?
     time_in = cycleTime();
     String type = Serial.readStringUntil(',');
-    time_sent = Serial.parseInt();
-    Serial.readStringUntil(',');
-    //--if data--//
     if(type == "D"){
+      time_sent = Serial.parseInt();
+      Serial.readStringUntil(',');
+      //--if data--//
       data_in = "";
       for(int i = 0; i < TOTAL_NODES; i++ ){
         data[i] = "E";
@@ -138,8 +138,8 @@ bool readData(){
         data[data_idx-1] = p_data;
         data_in = data_in + "," + p_data;
       }
-    }
-    return true;   
+    }    
+    return true;
   }
   return false; // if no message to read
 }

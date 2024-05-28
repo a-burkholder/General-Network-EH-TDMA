@@ -3,10 +3,10 @@
 /* Constants and assumptions*/
 const String ZONE = "1";
 const int TOTAL_NODES = 2;                                 // Total number of sensor nodes in the network
-const int TIME_SLOT = 500;                                  // amount of time per slot in milliseconds (ms) 10^-3
+const int TIME_SLOT = 300;                                  // amount of time per slot in milliseconds (ms) 10^-3
 const unsigned long ERROR = 60;                             // Transmission time error threshold
 const String ID = "01";                                     // Each node knows its ID based on assumption
-const int ENERGY_CHANCE = 1000;                             // energy harvest rate
+const int ENERGY_CHANCE = 100;                             // energy harvest rate
 const unsigned long CYCLE_LENGTH = (TOTAL_NODES+1)*TIME_SLOT;   // total length of one cycle
 unsigned long TRANSMIT_TIME = (ID.toInt()) * TIME_SLOT; // time in the cycle to transmit TRANSMIT_TIME
 
@@ -35,7 +35,7 @@ unsigned long cycleTime();
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
-  Serial.setTimeout(3000);
+  Serial.setTimeout(30);
 }
 
 void loop() {
@@ -66,15 +66,15 @@ void nodeFSM(){
         data_in = ",E,";                
         // to sync
         state = SYNC;
-        Serial.println("SYNC");
+        Serial.println("SYNC,");
       }
       break;
     
     case SYNC: // -- Verified working
       //--for if we are waiting for a message to get time from--//
+
       if(!updated && readData()){
         is_sent = false;
-        updated = true;
       }
       
       //--for if we have the time to sync off of--//
@@ -94,11 +94,10 @@ void nodeFSM(){
       
       //--if not in time slot--//
       else if(readData()){
-        updated = true;
         time_in_U = cycleTime();
         if (is_sync){
           state = SYNC;
-          Serial.println("SYNC");
+          Serial.println("SYNC1,");
           break;
         }
       }
@@ -145,52 +144,50 @@ bool energyAvailible(){
 // If it reads data, returns true
 // Test messages A,G,1234    1,D,1234,012,E,     A,S,1234,02,0102
 bool readData(){
-  if(Serial.available()){
+  if(Serial.available() > 0){
     String zone = Serial.readStringUntil(',');
     if(zone == "A" || zone == ZONE){
+      updated = true;
       time_in = millis() % CYCLE_LENGTH;          // grabs the nodal time of receiving
       String type1 = Serial.readStringUntil(','); // grabs the type of message
       global_time = Serial.parseInt();            // grabs the global time from sender
       
+      if(type1 == "D") {
+        data_in = Serial.readStringUntil('\n');
+        overlap_check = true;
+        is_sync = false;
+      }
       
-      static enum { D, S, G } type;
-      if(type1 == "D") type = D;
-      else if(type1 == "S") type = S;
-      else type = G;
-
-      switch (type){
-        case D: // data
-          data_in = Serial.readStringUntil('\n');
-          overlap_check = true;
-          is_sync = false;
-          break;
-
-        case S: // sync list
-          Serial.println("here");
-          long num_syncs = Serial.parseInt();
-          String sync_list = Serial.readString();
-          overlap_check = false;
+      else if(type1 == "S") {
+        long num_syncs = Serial.parseInt();
+        String sync_list = Serial.readString();
+        overlap_check = false;
           
-          //--linear search through all node IDs--//   REPLACE WITH BINARY SEARCH EVENTUALLY
-          for(int i = 1; i <= num_syncs; i++){
-            String to_check = sync_list.substring((i*2-1), (i*2)+1);
-            if(to_check == ID){ //if this node finds it's ID on the sync list
-              is_sync = true;
-              break;
-            }
+        //--linear search through all node IDs--//   REPLACE WITH BINARY SEARCH EVENTUALLY
+        for(int i = 1; i <= num_syncs; i++){
+          String to_check = sync_list.substring((i*2-1), (i*2)+1);
+          if(to_check == ID){ //if this node finds it's ID on the sync list
+            is_sync = true;
+            break;
           }
-          break;
-
-        case G: // general sync
-          is_sync = true;
-          overlap_check = false;
-          break;
+        }
       }
 
-      Serial.readStringUntil('\r'); // clears input buffer
+      else if(type1 == "G"){
+        is_sync = true;
+        overlap_check = false;
+      }
+      
+      while(Serial.available() > 0){
+        Serial.read(); // clears input buffer
+      }
       return true; // if theres a message
     }
+    while(Serial.available() > 0){
+      Serial.read(); // clears input buffer
+    }
   }
+   
   return false; // if no message to read
 }
 
