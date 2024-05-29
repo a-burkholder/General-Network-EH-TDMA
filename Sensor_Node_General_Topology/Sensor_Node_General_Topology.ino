@@ -8,7 +8,7 @@ const unsigned long ERROR = 60;                             // Transmission time
 const String ID = "01";                                     // Each node knows its ID based on assumption
 const int ENERGY_CHANCE = 100;                             // energy harvest rate
 const unsigned long CYCLE_LENGTH = (TOTAL_NODES+1)*TIME_SLOT;   // total length of one cycle
-unsigned long TRANSMIT_TIME = (ID.toInt()) * TIME_SLOT; // time in the cycle to transmit TRANSMIT_TIME
+unsigned long TRANSMIT_TIME = (ID.toInt() - 1) * TIME_SLOT; // time in the cycle to transmit TRANSMIT_TIME
 
 /* FLAGS... and stuff*/
 bool updated = false;       // tracks if we need to read a time for syncing or if we already did that
@@ -187,7 +187,6 @@ bool readData(){
       Serial.read(); // clears input buffer
     }
   }
-   
   return false; // if no message to read
 }
 

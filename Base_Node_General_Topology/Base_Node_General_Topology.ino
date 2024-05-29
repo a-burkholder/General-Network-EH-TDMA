@@ -6,7 +6,7 @@ const int TIME_SLOT = 300;                                  // amount of time pe
 const unsigned long CYCLE_LENGTH = (TOTAL_NODES+1) * TIME_SLOT; // total length of one cycle
 const int ERROR = 60;                                       // Transmission time error threshold
 const int ENERGY_CHANCE = 80;                               // energy harvest rate
-
+const int TRANSMIT_TIME = TIME_SLOT * TOTAL_NODES;
 
 
 /* FLAGS... and stuff*/
@@ -90,25 +90,25 @@ void baseFSM(){
           sync_list = sync_list + data_in.substring(1,3);
         }
         
-
-        // if overlap and send SYNC_LIST to adjust
-        if(is_overlap){
-          state = SYNC_LIST;
-        }
-          
         // if all nodes dead, SYNCA
 
 
+      }
+      else if(cycleTime() == TRANSMIT_TIME && !is_sent){
+        is_sent = true;
+        state = SYNC_LIST;
       }
       break;
       
     case SYNC_LIST:
       // send a sync to specific nodes
-      Serial.println("A,S," + (String)cycleTime() + "," + (String)num_syncs + "," + sync_list);
-      sync_list = "";
+      if(is_overlap){
+        Serial.println("A,S," + (String)cycleTime() + "," + (String)num_syncs + "," + sync_list);
+        sync_list = "";
+        is_overlap = false;
+        num_syncs = 0;
+      }
       state = ACTIVE;
-      is_overlap = false;
-      num_syncs = 0;
       break;
   }
 }
@@ -118,8 +118,8 @@ void baseFSM(){
 // If it reads data, returns true
 bool readData(){
   if(Serial.available() > 0){ // is there anything to read?
-    time_in = cycleTime();
     String type = Serial.readStringUntil(',');
+    time_in = cycleTime();
     if(type == "D"){
       time_sent = Serial.parseInt();
       Serial.readStringUntil(',');
@@ -138,8 +138,8 @@ bool readData(){
         data[data_idx-1] = p_data;
         data_in = data_in + "," + p_data;
       }
-    }    
-    return true;
+      return true;
+    } 
   }
   return false; // if no message to read
 }
