@@ -1,12 +1,12 @@
 
 
 /* Constants and assumptions*/
-const int num_zones = 1;
-const String ZONES[num_zones] = { "02"};
+const int num_zones = 2;
+const String ZONES[num_zones] = {"01", "02"};
 const int TOTAL_NODES = 2;                                 // Total number of sensor nodes in the network
 const int TIME_SLOT = 400;                                  // amount of time per slot in milliseconds (ms) 10^-3
 const unsigned long ERROR = 60;                             // Transmission time error threshold
-const String ID = "01";                                     // Each node knows its ID based on assumption
+const String ID = "02";                                     // Each node knows its ID based on assumption
 const int ENERGY_CHANCE = 100;                             // energy harvest rate
 const unsigned long CYCLE_LENGTH = (TOTAL_NODES+1)*TIME_SLOT;   // total length of one cycle
 unsigned long TRANSMIT_TIME = (ID.toInt() - 1) * TIME_SLOT; // time in the cycle to transmit TRANSMIT_TIME
@@ -74,14 +74,16 @@ void nodeFSM(){
     
     case SYNC: // -- Verified working
       //--for if we are waiting for a message to get time from--//
-
       if(!updated && readData()){
         is_sent = false;
       }
       
       //--for if we have the time to sync off of--//
       if(updated){
-        offset = global_time - time_in; 
+        offset = (global_time - (long)time_in);
+        if(offset < 0) {
+          offset = (long)CYCLE_LENGTH + offset;
+        }
         time_in_U = (time_in + offset) % CYCLE_LENGTH;
         state = WAIT;
         updated = false; // reset flag
@@ -90,7 +92,9 @@ void nodeFSM(){
 
     case WAIT: // -- Verified working
       //--if in time slot--//
+      
       if(cycleTime() == TRANSMIT_TIME && !is_sent){ 
+        
         state = ACTIVE; 
       }
       
@@ -157,6 +161,7 @@ bool readData(){
       time_in = millis() % CYCLE_LENGTH;          // grabs the nodal time of receiving
       String type1 = Serial.readStringUntil(','); // grabs the type of message
       global_time = Serial.parseInt();            // grabs the global time from sender
+      
       if(type1 == "D") {
         if(global_time < TRANSMIT_TIME){
           data_in = Serial.readStringUntil('\n');

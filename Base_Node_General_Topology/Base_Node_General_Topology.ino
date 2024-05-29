@@ -4,9 +4,9 @@
 const int num_zones = 1;
 const String ZONES[num_zones] = {"01"};
 const int TOTAL_NODES = 2;                                 // Total number of nodes in the network
-const int TIME_SLOT = 300;                                  // amount of time per slot in milliseconds (ms) 10^-3
+const int TIME_SLOT = 400;                                  // amount of time per slot in milliseconds (ms) 10^-3
 const unsigned long CYCLE_LENGTH = (TOTAL_NODES+1) * TIME_SLOT; // total length of one cycle
-const int ERROR = 60;                                       // Transmission time error threshold
+const int ERROR = 80;                                       // Transmission time error threshold
 const int ENERGY_CHANCE = 80;                               // energy harvest rate
 const int TRANSMIT_TIME = TIME_SLOT * TOTAL_NODES;
 
@@ -73,7 +73,7 @@ void baseFSM(){
         for(int i = data_in.length(); i >= 1; i -= 4){
           if(data_in.substring(i - 1, i) != "2"){
             //add to list
-            sync_list = sync_list + data_in.substring(i - 3, i - 1);
+            sync_list = sync_list + data_in.substring(i + 1, i + 3);
             num_syncs++;
             is_overlap = true;
           }
