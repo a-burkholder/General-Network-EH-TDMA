@@ -1,6 +1,8 @@
 
 
 /* Constants and assumptions*/
+const int num_zones = 1;
+const String ZONES[num_zones] = {"01"};
 const int TOTAL_NODES = 2;                                 // Total number of nodes in the network
 const int TIME_SLOT = 300;                                  // amount of time per slot in milliseconds (ms) 10^-3
 const unsigned long CYCLE_LENGTH = (TOTAL_NODES+1) * TIME_SLOT; // total length of one cycle
@@ -37,6 +39,7 @@ String data[TOTAL_NODES];
 void baseFSM();
 bool readData();
 unsigned long cycleTime();
+bool isInZone(String zone);
 
 void setup() {
   // put your setup code here, to run once:
@@ -118,28 +121,33 @@ void baseFSM(){
 // If it reads data, returns true
 bool readData(){
   if(Serial.available() > 0){ // is there anything to read?
-    String type = Serial.readStringUntil(',');
-    time_in = cycleTime();
-    if(type == "D"){
-      time_sent = Serial.parseInt();
-      Serial.readStringUntil(',');
-      //--if data--//
-      data_in = "";
-      for(int i = 0; i < TOTAL_NODES; i++ ){
-        data[i] = "E";
-      }
-      while(true){
-        String p_data = Serial.readStringUntil(',');
-        if(p_data == "E"){
-          Serial.readStringUntil('\r');         
-          break;// D,4500,102,092,082,072,063,052,042,033,022,012,E,
+    String zone = Serial.readStringUntil(',');
+    if(isInZone(zone)){
+      String type = Serial.readStringUntil(',');
+      time_in = cycleTime();
+      if(type == "D"){
+        time_sent = Serial.parseInt();
+        Serial.readStringUntil(',');
+        //--if data--//
+        data_in = "";
+        for(int i = 0; i < TOTAL_NODES; i++ ){
+          data[i] = "E";
         }
-        int data_idx = p_data.substring(0,2).toInt();
-        data[data_idx-1] = p_data;
-        data_in = data_in + "," + p_data;
-      }
-      return true;
-    } 
+        while(true){
+          String p_data = Serial.readStringUntil(',');
+          if(p_data == "E"){
+            Serial.readStringUntil('\r');         
+            break;// D,4500,102,092,082,072,063,052,042,033,022,012,E,
+          }
+          int data_idx = p_data.substring(0,2).toInt();
+          data[data_idx-1] = p_data;
+          data_in = data_in + "," + p_data;
+        }
+        return true;
+      } 
+    }
+
+    
   }
   return false; // if no message to read
 }
@@ -156,3 +164,19 @@ unsigned long cycleTime(){
   return time;
 }
 
+
+// inInZone()
+// helper to find if the message is for this node
+bool isInZone(String zone){
+  if(zone == "A"){ return true; }
+  int num_zones_in = zone.length();
+  for(int i = 0; i < num_zones; i++){
+    for(int j = 0; j < num_zones_in; j++){
+      String to_check = zone.substring(j, j+2);
+      if(ZONES[i] == to_check){
+        return true;
+      }
+    }
+  }
+  return false;
+}

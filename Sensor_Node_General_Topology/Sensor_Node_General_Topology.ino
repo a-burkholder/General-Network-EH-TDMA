@@ -1,7 +1,8 @@
 
 
 /* Constants and assumptions*/
-const String ZONE = "1";
+const int num_zones = 2;
+const String ZONES[num_zones] = {"01", "02"};
 const int TOTAL_NODES = 2;                                 // Total number of sensor nodes in the network
 const int TIME_SLOT = 300;                                  // amount of time per slot in milliseconds (ms) 10^-3
 const unsigned long ERROR = 60;                             // Transmission time error threshold
@@ -31,6 +32,7 @@ void nodeFSM();
 bool energyAvailible();
 bool readData();
 unsigned long cycleTime();
+bool isInZone(String zone);
 
 void setup() {
   // put your setup code here, to run once:
@@ -112,7 +114,11 @@ void nodeFSM(){
         else if (clock_diff > -ERROR){ is_overlap = 3; } // ahead
       }
       //--make and send the data--//
-      String message = "D," + (String)cycleTime() + "," + ID + (String)is_overlap + data_in;
+      String message = "";
+      for(int i = 0; i < num_zones; i++){
+        message = message + ZONES[i];
+      }
+      message = message + ",D," + (String)cycleTime() + "," + ID + (String)is_overlap + data_in;
       Serial.println(message);
       //--reset--//
       data_in = ",E,";
@@ -146,13 +152,13 @@ bool energyAvailible(){
 bool readData(){
   if(Serial.available() > 0){
     String zone = Serial.readStringUntil(',');
-    if(zone == "A" || zone == ZONE){
+    if(isInZone(zone)){
       updated = true;
       time_in = millis() % CYCLE_LENGTH;          // grabs the nodal time of receiving
       String type1 = Serial.readStringUntil(','); // grabs the type of message
       global_time = Serial.parseInt();            // grabs the global time from sender
       
-      if(type1 == "D") {
+      if(type1 == "D" && global_time < TRANSMIT_TIME) {
         data_in = Serial.readStringUntil('\n');
         overlap_check = true;
         is_sync = false;
@@ -195,10 +201,27 @@ bool readData(){
 // also resets the is_sent variable so we can send a new message if we get to a new cycle
 unsigned long cycleTime(){
   long time = ((long)(millis() % CYCLE_LENGTH) + offset) % (long)CYCLE_LENGTH;
-  if(last_time > time){ is_sent = false; } // checks if the clock reset and resets is_sent
+  if(last_time > time){ 
+    is_sent = false; 
+  } // checks if the clock reset and resets is_sent
   last_time = time; // for next time we call the function
   return (unsigned long)time;
 }
 
+// inInZone()
+// helper to find if the message is for this node
+bool isInZone(String zone){
+  if(zone == "A"){ return true; }
+  int num_zones_in = zone.length();
+  for(int i = 0; i < num_zones; i++){
+    for(int j = 0; j < num_zones_in; j++){
+      String to_check = zone.substring(j, j+2);
+      if(ZONES[i] == to_check){
+        return true;
+      }
+    }
+  }
+  return false;
+}
 
 
