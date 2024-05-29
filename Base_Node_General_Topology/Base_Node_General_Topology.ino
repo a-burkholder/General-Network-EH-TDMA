@@ -42,7 +42,7 @@ void setup() {
   // put your setup code here, to run once:
   transmit_time = (TOTAL_NODES) * TIME_SLOT;
   Serial.begin(9600);
-  Serial.setTimeout(3000);
+  Serial.setTimeout(30);
 }
 
 void loop() {
@@ -131,7 +131,7 @@ bool readData(){
       while(true){
         String p_data = Serial.readStringUntil(',');
         if(p_data == "E"){
-          Serial.readStringUntil('\n');         
+          Serial.readStringUntil('\r');         
           break;// D,4500,102,092,082,072,063,052,042,033,022,012,E,
         }
         int data_idx = p_data.substring(0,2).toInt();
