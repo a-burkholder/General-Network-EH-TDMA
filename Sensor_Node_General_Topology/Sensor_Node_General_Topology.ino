@@ -25,7 +25,7 @@ unsigned long time_in = 0;          // time that this node received the message
 unsigned long time_in_U = 0;        // time_in but updated to global time
 
 /* Transmition stuff */
-String data_in = ",E,";                // the data coming in
+String data_in = ",E,";             // the data coming in
 
 /* Function headers */
 void nodeFSM();
@@ -43,7 +43,6 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   nodeFSM();
-  
 }
 
 // nodeFSM()

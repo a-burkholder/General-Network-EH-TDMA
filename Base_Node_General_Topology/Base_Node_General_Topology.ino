@@ -12,10 +12,8 @@ const int TRANSMIT_TIME = TIME_SLOT * TOTAL_NODES;
 
 
 /* FLAGS... and stuff*/
-bool updated = false;              // tracks if we need to read a time for syncing or if we already did that
 bool is_sent = false;              // checks if a message was sent this cycle
 bool is_overlap = false;           // to send the state mechine to SYNC_LIST if true          
-int overlap_flag;                  // to hold the overlap info: 1 for behind, 2 for ok, 3 for ahead
 
 
 /* Timers */
@@ -25,6 +23,7 @@ unsigned long last_time = 0;      // the time at the last time it was checked
 long time_sent;                   // the time the previous node sent the message
 unsigned long time_in;            // local arrival time, then converted to global arrival time, ideally the same as time_sent
 int clock_diff;                   // used for calculating overlap between nodes
+unsigned long last_packet_in;     // used for checking if we are not getting messages. if no messages in 3 cycles, reset the network
 
 
 /* Transmition stuff */
@@ -92,14 +91,17 @@ void baseFSM(){
           num_syncs++;
           sync_list = sync_list + data_in.substring(1,3);
         }
-        
-        // if all nodes dead, SYNCA
-
-
       }
+
       else if(cycleTime() == TRANSMIT_TIME && !is_sent){
         is_sent = true;
         state = SYNC_LIST;
+      }
+
+      // if all nodes dead, SYNCA
+      if(millis() - last_packet_in > 3 * CYCLE_LENGTH){
+        state = SYNC_ALL;
+        break;
       }
       break;
       
@@ -123,6 +125,7 @@ bool readData(){
   if(Serial.available() > 0){ // is there anything to read?
     String zone = Serial.readStringUntil(',');
     if(isInZone(zone)){
+      last_packet_in = millis();
       String type = Serial.readStringUntil(',');
       time_in = cycleTime();
       if(type == "D"){
@@ -146,8 +149,6 @@ bool readData(){
         return true;
       } 
     }
-
-    
   }
   return false; // if no message to read
 }
