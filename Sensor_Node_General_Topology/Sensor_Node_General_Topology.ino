@@ -1,13 +1,13 @@
 
 
 /* Constants and assumptions*/
-const int num_zones = 2;
-const String ZONES[num_zones] = {"01", "02"};
-const int TOTAL_NODES = 2;                                 // Total number of sensor nodes in the network
-const int TIME_SLOT = 400;                                  // amount of time per slot in milliseconds (ms) 10^-3
-const unsigned long ERROR = 60;                             // Transmission time error threshold
-const String ID = "02";                                     // Each node knows its ID based on assumption
+const String HEARABLE[] = {};                          // List of nodes that this node can hear (not including base station)
+const String ID = "01";                                    // Each node knows its ID based on assumption
+const int TOTAL_NODES = 3;                                 // Total number of sensor nodes in the network
+const int TIME_SLOT = 400;                                 // amount of time per slot in milliseconds (ms) 10^-3
+const unsigned long ERROR = 80;                            // Transmission time error threshold
 const int ENERGY_CHANCE = 100;                             // energy harvest rate
+
 const unsigned long CYCLE_LENGTH = (TOTAL_NODES+1)*TIME_SLOT;   // total length of one cycle
 unsigned long TRANSMIT_TIME = (ID.toInt() - 1) * TIME_SLOT; // time in the cycle to transmit TRANSMIT_TIME
 
@@ -37,7 +37,7 @@ bool isInZone(String zone);
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
-  Serial.setTimeout(30);
+  Serial.setTimeout(5);
 }
 
 void loop() {
@@ -67,12 +67,12 @@ void nodeFSM(){
         data_in = ",E,";                
         // to sync
         state = SYNC;
-        Serial.println("SYNC,");
       }
       break;
     
     case SYNC: // -- Verified working
       //--for if we are waiting for a message to get time from--//
+      
       if(!updated && readData()){
         is_sent = false;
       }
@@ -90,10 +90,9 @@ void nodeFSM(){
       break;
 
     case WAIT: // -- Verified working
+      is_sync = false;
       //--if in time slot--//
-      
       if(cycleTime() == TRANSMIT_TIME && !is_sent){ 
-        
         state = ACTIVE; 
       }
       
@@ -102,7 +101,6 @@ void nodeFSM(){
         time_in_U = cycleTime();
         if (is_sync){
           state = SYNC;
-          Serial.println("SYNC1,");
           break;
         }
       }
@@ -118,10 +116,7 @@ void nodeFSM(){
       }
       //--make and send the data--//
       String message = "";
-      for(int i = 0; i < num_zones; i++){
-        message = message + ZONES[i];
-      }
-      message = message + ",D," + (String)cycleTime() + "," + ID + (String)is_overlap + data_in;
+      message = ID + ",D," + (String)cycleTime() + "," + ID + (String)is_overlap + data_in;
       Serial.println(message);
       //--reset--//
       data_in = ",E,";
@@ -153,52 +148,49 @@ bool energyAvailible(){
 // If it reads data, returns true
 // Test messages A,G,1234    1,D,1234,012,E,     A,S,1234,02,0102
 bool readData(){
-  if(Serial.available() > 0){
-    String zone = Serial.readStringUntil(',');
-    if(isInZone(zone)){
-      updated = true;
-      time_in = millis() % CYCLE_LENGTH;          // grabs the nodal time of receiving
-      String type1 = Serial.readStringUntil(','); // grabs the type of message
-      global_time = Serial.parseInt();            // grabs the global time from sender
-      
-      if(type1 == "D") {
-        if(global_time < TRANSMIT_TIME){
-          data_in = Serial.readStringUntil('\n');
-          overlap_check = true;
-        }
-        is_sync = false;
-      }
-      
-      else if(type1 == "S") {
-        long num_syncs = Serial.parseInt();
-        String sync_list = Serial.readString();
-        overlap_check = false;
-          
-        //--linear search through all node IDs--//   REPLACE WITH BINARY SEARCH EVENTUALLY
-        for(int i = 1; i <= num_syncs; i++){
-          String to_check = sync_list.substring((i*2-1), (i*2)+1);
-          if(to_check == ID){ //if this node finds it's ID on the sync list
-            is_sync = true;
-            break;
-          }
-        }
-      }
-
-      else if(type1 == "G"){
-        is_sync = true;
-        overlap_check = false;
-      }
-      
-      while(Serial.available() > 0){
-        Serial.read(); // clears input buffer
-      }
-      return true; // if theres a message
-    }
-    while(Serial.available() > 0){
-      Serial.read(); // clears input buffer
-    }
+  if(Serial.available() <= 0){
+    return false;
   }
-  return false; // if no message to read
+  String sender = Serial.readStringUntil(',');
+  if(isHearable(sender)){
+    updated = true;
+    time_in = millis() % CYCLE_LENGTH;          // grabs the nodal time of receiving
+    String type1 = Serial.readStringUntil(','); // grabs the type of message
+    global_time = Serial.parseInt();            // grabs the global time from sender
+    
+    if(type1 == "D") {
+      if(global_time < TRANSMIT_TIME){
+        data_in = Serial.readStringUntil('\n');
+        overlap_check = true;
+      }
+      is_sync = false;
+    }
+    
+    else if(type1 == "S") {
+      long num_syncs = Serial.parseInt();
+      Serial.readStringUntil(',');
+      String sync_list = Serial.readStringUntil(',');
+      overlap_check = false;
+      //--linear search through all node IDs--//   REPLACE WITH BINARY SEARCH EVENTUALLY
+
+      for(int i = 0; i < num_syncs; i++){
+        String to_check = sync_list.substring((i*2), (i*2)+2);
+        if(to_check == ID){ //if this node finds it's ID on the sync list
+          is_sync = true;
+          break;
+        }
+      }
+      Serial.readStringUntil('\n');
+    }
+
+    else if(type1 == "G"){
+      is_sync = true;
+      overlap_check = false;
+      Serial.readStringUntil('\n');
+    }
+    return true; // if theres a message
+  }
+  Serial.readStringUntil('\n');
 }
 
 // cycleTime() -- Verified working
@@ -215,15 +207,11 @@ unsigned long cycleTime(){
 
 // inInZone()
 // helper to find if the message is for this node
-bool isInZone(String zone){
-  if(zone == "A"){ return true; }
-  int num_zones_in = zone.length();
-  for(int i = 0; i < num_zones; i++){
-    for(int j = 0; j < num_zones_in; j++){
-      String to_check = zone.substring(j, j+2);
-      if(ZONES[i] == to_check){
-        return true;
-      }
+bool isHearable(String sender){
+  if(sender == "B"){ return true; }
+  for(String i:HEARABLE){
+    if(i == sender){
+      return true;
     }
   }
   return false;

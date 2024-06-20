@@ -1,13 +1,12 @@
 
 
 /* Constants and assumptions*/
-const int num_zones = 1;
-const String ZONES[num_zones] = {"01"};
-const int TOTAL_NODES = 2;                                 // Total number of nodes in the network
+const String HEARABLE[] = {"03", "02", "01"};
+const int TOTAL_NODES = 3;                                 // Total number of nodes in the network
 const int TIME_SLOT = 400;                                  // amount of time per slot in milliseconds (ms) 10^-3
 const unsigned long CYCLE_LENGTH = (TOTAL_NODES+1) * TIME_SLOT; // total length of one cycle
 const int ERROR = 80;                                       // Transmission time error threshold
-const int ENERGY_CHANCE = 80;                               // energy harvest rate
+const int ENERGY_CHANCE = 100;                               // energy harvest rate
 const int TRANSMIT_TIME = TIME_SLOT * TOTAL_NODES;
 
 
@@ -38,7 +37,7 @@ String data[TOTAL_NODES];
 void baseFSM();
 bool readData();
 unsigned long cycleTime();
-bool isInZone(String zone);
+bool isHearable(String sender);
 
 void setup() {
   // put your setup code here, to run once:
@@ -59,15 +58,17 @@ void baseFSM(){
   static enum { SYNC_ALL, ACTIVE, SYNC_LIST } state = SYNC_ALL;
   switch(state){
     case SYNC_ALL:
-      Serial.println("A,G," + (String)cycleTime());// send a general sync message 
+      while(!readData()){
+        Serial.println("B,G," + (String)cycleTime());// send a general sync message 
+      }
       state = ACTIVE;
       break;
 
     case ACTIVE:
+      cycleTime();
       if(readData()){
-        Serial.println("time in = " + (String)time_in + ",");
+        cycleTime();
         // parse the data and check for any overlapp errors (1 behind, 2 ok, 3 ahead)
-        sync_list = "";
         
         for(int i = data_in.length(); i >= 1; i -= 4){
           if(data_in.substring(i - 1, i) != "2"){
@@ -79,15 +80,13 @@ void baseFSM(){
         }
         
         //--check for overlap errors in most recent message--//
-        clock_diff = abs((long)time_in - time_sent);
+        clock_diff = abs((long)time_in - (time_sent + 50));
         if(clock_diff > ERROR){ // behind
           sync_list = sync_list + data_in.substring(1,3);
-          is_overlap = true;
           num_syncs++;
         }
         
         else if (clock_diff < -ERROR){ // ahead
-          is_overlap = true; 
           num_syncs++;
           sync_list = sync_list + data_in.substring(1,3);
         }
@@ -107,12 +106,15 @@ void baseFSM(){
       
     case SYNC_LIST:
       // send a sync to specific nodes
-      if(is_overlap){
-        Serial.println("A,S," + (String)cycleTime() + "," + (String)num_syncs + "," + sync_list);
-        sync_list = "";
-        is_overlap = false;
-        num_syncs = 0;
+      if(num_syncs > 0){
+        Serial.println("B,S," + (String)cycleTime() + "," + (String)num_syncs + "," + sync_list + ",");
+        
       }
+      else{
+        Serial.println("All good,");
+      }
+      num_syncs = 0;
+      sync_list = "";
       state = ACTIVE;
       break;
   }
@@ -123,8 +125,8 @@ void baseFSM(){
 // If it reads data, returns true
 bool readData(){
   if(Serial.available() > 0){ // is there anything to read?
-    String zone = Serial.readStringUntil(',');
-    if(isInZone(zone)){
+    String sender = Serial.readStringUntil(',');
+    if(isHearable(sender)){
       last_packet_in = millis();
       String type = Serial.readStringUntil(',');
       time_in = cycleTime();
@@ -160,6 +162,7 @@ unsigned long cycleTime(){
   unsigned long time = millis() % CYCLE_LENGTH;
   if(last_time > time){ // checks if the clock reset and resets is_sent
     is_sent = false;
+    sync_list = "";
   }
   last_time = time; // for next time we call the function
   return time;
@@ -168,15 +171,10 @@ unsigned long cycleTime(){
 
 // inInZone()
 // helper to find if the message is for this node
-bool isInZone(String zone){
-  if(zone == "A"){ return true; }
-  int num_zones_in = zone.length();
-  for(int i = 0; i < num_zones; i++){
-    for(int j = 0; j < num_zones_in; j++){
-      String to_check = zone.substring(j, j+2);
-      if(ZONES[i] == to_check){
-        return true;
-      }
+bool isHearable(String sender){
+  for(String i : HEARABLE){
+    if(i == sender){
+      return true;
     }
   }
   return false;
