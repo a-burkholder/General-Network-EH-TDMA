@@ -4,7 +4,7 @@
 const String HEARABLE[] = {};                          // List of nodes that this node can hear (not including base station)
 const String ID = "01";                                    // Each node knows its ID based on assumption
 const int TOTAL_NODES = 3;                                 // Total number of sensor nodes in the network
-const int TIME_SLOT = 400;                                 // amount of time per slot in milliseconds (ms) 10^-3
+const int TIME_SLOT = 1000;                                 // amount of time per slot in milliseconds (ms) 10^-3
 const unsigned long ERROR = 80;                            // Transmission time error threshold
 const int ENERGY_CHANCE = 100;                             // energy harvest rate
 
@@ -32,12 +32,12 @@ void nodeFSM();
 bool energyAvailible();
 bool readData();
 unsigned long cycleTime();
-bool isInZone(String zone);
+bool isHearable(String sender);
 
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
-  Serial.setTimeout(5);
+  Serial.setTimeout(30);
 }
 
 void loop() {
@@ -79,7 +79,7 @@ void nodeFSM(){
       
       //--for if we have the time to sync off of--//
       if(updated){
-        offset = (global_time - (long)time_in);
+        offset = (global_time - (long)time_in); // add 50ms to account for process timing found during early testing
         if(offset < 0) {
           offset = (long)CYCLE_LENGTH + offset;
         }
@@ -110,17 +110,22 @@ void nodeFSM(){
       //--check for overlap errors--//
       int clock_diff =  time_in_U - global_time; 
       int is_overlap = 2; // base case, all good
-      if(overlap_check){
-        if(clock_diff > ERROR){ is_overlap = 1; }        // behind
-        else if (clock_diff > -ERROR){ is_overlap = 3; } // ahead
+      if(overlap_check && (time_in_U > global_time + TIME_SLOT - ERROR || time_in_U < global_time)){
+          is_overlap = 1;        //There is an error
       }
-      //--make and send the data--//
-      String message = "";
-      message = ID + ",D," + (String)cycleTime() + "," + ID + (String)is_overlap + data_in;
-      Serial.println(message);
+      //--send the data--//
+      Serial.print(ID);
+      Serial.print(",D,");
+      Serial.print(cycleTime());
+      Serial.print(",");
+      Serial.print(ID);
+      Serial.print(is_overlap);
+      Serial.println(data_in);
+      Serial.flush();
       //--reset--//
       data_in = ",E,";
       is_sent = true;
+      overlap_check = false;
       //--energy checking--//
       if(energyAvailible()){
         state = WAIT;
@@ -160,7 +165,11 @@ bool readData(){
     
     if(type1 == "D") {
       if(global_time < TRANSMIT_TIME){
-        data_in = Serial.readStringUntil('\n');
+        data_in = Serial.readStringUntil('\r');
+        if(!data_in.endsWith(",E,")){
+          data_in = data_in + ",E,";
+        }
+        Serial.read();
         overlap_check = true;
       }
       is_sync = false;
@@ -170,7 +179,6 @@ bool readData(){
       long num_syncs = Serial.parseInt();
       Serial.readStringUntil(',');
       String sync_list = Serial.readStringUntil(',');
-      overlap_check = false;
       //--linear search through all node IDs--//   REPLACE WITH BINARY SEARCH EVENTUALLY
 
       for(int i = 0; i < num_syncs; i++){
@@ -185,7 +193,6 @@ bool readData(){
 
     else if(type1 == "G"){
       is_sync = true;
-      overlap_check = false;
       Serial.readStringUntil('\n');
     }
     return true; // if theres a message
