@@ -5,16 +5,15 @@ const String HEARABLE[] = {"01", "02", "03"};
 const PROGMEM int TOTAL_NODES = 3;                                 // Total number of nodes in the network
 const PROGMEM int TIME_SLOT = 1000;                                  // amount of time per slot in milliseconds (ms) 10^-3
 const PROGMEM unsigned long CYCLE_LENGTH = (TOTAL_NODES+1) * TIME_SLOT; // total length of one cycle
-const PROGMEM int ERROR = 80;                                       // Transmission time error threshold
-const PROGMEM int ENERGY_CHANCE = 100;                               // energy harvest rate
-const PROGMEM int TRANSMIT_TIME = TIME_SLOT * TOTAL_NODES;
+const PROGMEM int ERROR = 70;                                       // Transmission time error threshold
+const PROGMEM int ENERGY_CHANCE = 101;                               // energy harvest rate
+const PROGMEM int TRANSMIT_TIME = TIME_SLOT * TOTAL_NODES + (TIME_SLOT / 2);
 
 
 /* FLAGS... and stuff*/
 bool is_sent = false;              // checks if a message was sent this cycle
 
 /* Timers */
-unsigned long transmit_time;      // time in the cycle to transmit
 long time_sent = 0;                   // the time the previous node sent the message
 unsigned long time_in = 0;            // local arrival time, then converted to global arrival time, ideally the same as time_sent
 unsigned long last_packet_in = 0;     // used for checking if we are not getting messages. if no messages in 3 cycles, reset the network
@@ -42,7 +41,6 @@ bool isHearable(const String& sender);
 
 void setup() {
   // put your setup code here, to run once:
-  transmit_time = (TOTAL_NODES) * TIME_SLOT;
   Serial.begin(9600);
   Serial.setTimeout(30);
 
@@ -74,7 +72,7 @@ void baseFSM(){
         state = ACTIVE;
         break;
         }
-        else if(cycleTime() == transmit_time){
+        else if(cycleTime() == TRANSMIT_TIME){
           Serial.print(F("B,G,"));// send a general sync message 
           Serial.println(cycleTime());
           Serial.flush();
@@ -203,7 +201,7 @@ bool readData(){
           data_in = data_in + "," + p_data;
         }
         //--check for overlap errors in incoming message--//
-        if(time_in > time_sent + TIME_SLOT - ERROR || time_in < time_sent){
+        if(time_in > time_sent + (TIME_SLOT / 2) - ERROR || time_in < time_sent - (TIME_SLOT / 2)){
           needs_sync[data_in.substring(1,3).toInt()-1] = 3;
         }
       } 
