@@ -1,12 +1,12 @@
 
 
 /* Constants and assumptions*/
-const String HEARABLE[] = {"01", "02", "03"};
+const String HEARABLE[] = {"03"};
 const PROGMEM int TOTAL_NODES = 3;                                 // Total number of nodes in the network
-const PROGMEM int TIME_SLOT = 1500;                                  // amount of time per slot in milliseconds (ms) 10^-3
+const PROGMEM int TIME_SLOT = 1000;                                  // amount of time per slot in milliseconds (ms) 10^-3
 const PROGMEM unsigned long CYCLE_LENGTH = (TOTAL_NODES) * TIME_SLOT; // total length of one cycle
 const PROGMEM int ERROR = 60;                                       // Transmission time error threshold
-const PROGMEM int ENERGY_CHANCE = 40;                               // energy harvest rate
+const PROGMEM int ENERGY_CHANCE = 80;                               // energy harvest rate
 const PROGMEM int TRANSMIT_TIME = TIME_SLOT * TOTAL_NODES + (TIME_SLOT / 2);
 
 
